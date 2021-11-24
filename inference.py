@@ -109,7 +109,13 @@ def infer(in_file, out_file='./CMeEE_test_answer.json',
             model_save_path='./checkpoint/68.2796_macbert_large/macbert-large', 
             maxlen=512, c_size=9, id2c=_id2c):
     '''
-    download model?
+    Args:
+        in_file (string):
+        out_file (string, optional):
+        model_save_path (string, optional):
+        maxlen (int, optional):
+        c_size (int, optional):
+        id2c (dictionary, optional):
     '''
     if not os.path.exists(in_file):
         print("[ERROR] in_file does not exist!")
@@ -129,9 +135,18 @@ def infer(in_file, out_file='./CMeEE_test_answer.json',
     tokenizer.add_special_tokens({'pad_token': '[PAD]'})
 
     if not os.path.exists(model_save_path):
-        os.makedirs(os.path.dirname(model_save_path))
-        pass#download
-    model_base = torch.load(model_save_path)
+        model_dir = os.path.dirname(model_save_path)
+        os.makedirs(model_dir)
+        # Reference:
+        # https://github.com/pytorch/pytorch/blob/b5b62b340891f041b378681577c74922d21700a9/torch/hub.py
+        url = 'https://github.com/cb1cyf/NNER/releases/download/v0.0.1/macbert-large'
+        try:
+            model_base = torch.hub.load_state_dict_from_url(url, model_dir)
+        except:
+            torch.hub.download_url_to_file(url, model_save_path)
+            model_base = torch.load(model_save_path)
+    else:
+        model_base = torch.load(model_save_path)
     NER = _NamedEntityRecognizer(maxlen, c_size, id2c, device, tokenizer, model_base)
     NER.predict_to_file(in_file, out_file)
 
