@@ -110,12 +110,17 @@ def infer(in_file, out_file='./CMeEE_test_answer.json',
             maxlen=512, c_size=9, id2c=_id2c):
     '''
     Args:
-        in_file (string):
-        out_file (string, optional):
-        model_save_path (string, optional):
-        maxlen (int, optional):
-        c_size (int, optional):
-        id2c (dictionary, optional):
+        in_file (string): path of input file
+        out_file (string, optional): path of output file
+            Default: './CMeEE_test_answer.json'
+        model_save_path (string, optional): path of pretrained model
+            Default: './checkpoint/68.2796_macbert_large/macbert-large'
+        maxlen (int, optional): max length of sentence
+            Default: 512
+        c_size (int, optional): number of c???
+            Default: 9
+        id2c (dictionary, optional): mapping between id and c???
+            Default: _id2c
     '''
     if not os.path.exists(in_file):
         print("[ERROR] in_file does not exist!")
