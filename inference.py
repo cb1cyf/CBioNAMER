@@ -2,11 +2,13 @@ import os
 import numpy as np
 import json
 import torch
+from torch import nn
 from torch.utils.data import Dataset, DataLoader
-from transformers import BertTokenizerFast
+from transformers import BertModel, BertTokenizerFast
+from .model import GlobalPointer
 from .utils import rematch
 
-__all__=['infer']
+__all__=['load_NNER']
 
 
 class _CustomDataset4test(Dataset):
@@ -29,9 +31,24 @@ class _CustomDataset4test(Dataset):
 
         return enc_context
 
+class _GlobalPointerNet(nn.Module):
+    def __init__(self, model_name, c_size=9, head_size=64, embedding_size=1024):
+        super(_GlobalPointerNet, self).__init__()
+        self.head = GlobalPointer(c_size, head_size, embedding_size)
+        self.bert = BertModel.from_pretrained(model_name)
+
+    def forward(self, input_ids, attention_mask, token_type_ids):
+        x1 = self.bert(input_ids, attention_mask=attention_mask, token_type_ids=token_type_ids)
+        x2 = x1.last_hidden_state
+        #last_hidden_state (torch.FloatTensor of shape (batch_size, sequence_length, hidden_size))
+        # – Sequence of hidden-states at the output of the last layer of the model.
+
+        logits = self.head(x2, mask=attention_mask)
+        return logits
+
 class _NamedEntityRecognizer(object):
     """
-    命名实体识别器
+    Named Entity Recognizer
     """
     def __init__(self, maxlen, c_size, id2c, device, tokenizer, model_base):
         self.maxlen = maxlen
@@ -42,7 +59,14 @@ class _NamedEntityRecognizer(object):
         self.model_base = model_base
 
     def recognize(self, text, threshold=0):
-        
+        """
+        Args:
+            text (str): input sentence
+            threshold (int): threshold score to filter out recognized entity with low confidence score
+                Default: 0
+        Returns:
+            entities (list): list of tuples with recognized entity. The format is [(start_id, end_id, entity_class), ...]
+        """
         self.model_base.eval()
         text = text[0:self.maxlen]
  
@@ -81,14 +105,15 @@ class _NamedEntityRecognizer(object):
 
     def predict_to_file(self, in_file, out_file):
         """
-        预测到文件
-        可以提交到 https://tianchi.aliyun.com/dataset/dataDetail?dataId=95414
+        Args:
+            in_file (str): path of input json file
+            out_file (str): path of output json file which can be submitted to CBLUE
         """
         data = json.load(open(in_file))
         for d in data:
             d['entities'] = []
             entities = self.recognize(d['text'])
-            print(entities)
+            #print(entities)
             for e in entities:
                 d['entities'].append({
                     'start_idx': e[0],
@@ -105,58 +130,49 @@ class _NamedEntityRecognizer(object):
 
 _id2c = {0: 'dis', 1: 'sym', 2: 'pro', 3: 'equ', 4: 'dru', 5: 'ite', 6: 'bod', 7: 'dep', 8: 'mic'}
 
-def infer(in_file, out_file='./CMeEE_test_answer.json', 
-            model_save_path='./checkpoint/68.2796_macbert_large/macbert-large', 
-            maxlen=512, c_size=9, id2c=_id2c):
+def load_NNER(model_save_path='./checkpoint/macbert-large_dict.pth', 
+                maxlen=512, c_size=9, id2c=_id2c):
     '''
     Args:
-        in_file (string): path of input file
-        out_file (string, optional): path of output file
-            Default: './CMeEE_test_answer.json'
         model_save_path (string, optional): path of pretrained model
-            Default: './checkpoint/68.2796_macbert_large/macbert-large'
+            Default: './checkpoint/macbert-large_dict.pth'
         maxlen (int, optional): max length of sentence
             Default: 512
-        c_size (int, optional): number of c???
+        c_size (int, optional): number of entity class
             Default: 9
-        id2c (dictionary, optional): mapping between id and c???
+        id2c (dictionary, optional): mapping between id and entity class
             Default: _id2c
+    Returns:
+        NNER (class _NamedEntityRecognizer): the pretrained NNER model
     '''
-    if not os.path.exists(in_file):
-        print("[ERROR] in_file does not exist!")
-        return
-    if not os.path.isfile(in_file):
-        print("[ERROR] in_file is not a file!")
-        return
-    out_dir = os.path.dirname(out_file)
-    if not os.path.exists(out_dir):
-        os.makedirs(out_dir)
-
     device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
     print("Using {} device".format(device))
 
     model_name = 'hfl/chinese-macbert-large'
     tokenizer = BertTokenizerFast.from_pretrained(model_name)
     tokenizer.add_special_tokens({'pad_token': '[PAD]'})
+    model_base = _GlobalPointerNet(model_name).to(device)
 
     if not os.path.exists(model_save_path):
         model_dir = os.path.dirname(model_save_path)
         os.makedirs(model_dir)
         # Reference:
         # https://github.com/pytorch/pytorch/blob/b5b62b340891f041b378681577c74922d21700a9/torch/hub.py
-        url = 'https://github.com/cb1cyf/NNER/releases/download/v0.0.1/macbert-large'
-        try:
-            model_base = torch.hub.load_state_dict_from_url(url, model_dir)
-        except:
-            torch.hub.download_url_to_file(url, model_save_path)
-            model_base = torch.load(model_save_path)
-    else:
-        model_base = torch.load(model_save_path)
-    NER = _NamedEntityRecognizer(maxlen, c_size, id2c, device, tokenizer, model_base)
-    NER.predict_to_file(in_file, out_file)
-
+        url = 'https://github.com/cb1cyf/NNER/releases/download/v0.0.1/macbert-large_dict.pth'
+        #model_base = torch.hub.load_state_dict_from_url(url, model_dir)
+        torch.hub.download_url_to_file(url, model_save_path)
+    state_dict = torch.load(model_save_path, map_location=device)
+    # multi-gpu -> 1 gpu
+    model_base.load_state_dict({k.replace('module.', ''): v for k, v in state_dict.items()})
+    NNER = _NamedEntityRecognizer(maxlen, c_size, id2c, device, tokenizer, model_base)
+    return NNER
 
 
 if __name__ == '__main__':
-    in_file = './dataset/normal/CMeEE_test.json'
-    infer(in_file)
+    in_file = '../CMeEE_test.json'
+    #infer(in_file)
+
+    ner = load_NNER()
+    print('successfully load model')
+    out_file='../CMeEE_test_answer.json'
+    ner.predict_to_file(in_file, out_file)
