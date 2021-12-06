@@ -1,12 +1,12 @@
 # ***model name***
 
-***xxx*** is our method used in [CBLUE](https://tianchi.aliyun.com/dataset/dataDetail?dataId=95414) (Chinese Biomedical Language Understanding Evaluation), a benchmark of Nested Named Entity Recognition. We got the ***xx*** price of the benchmark by ***date***.
+***xxx*** is our method used in [CBLUE](https://tianchi.aliyun.com/dataset/dataDetail?dataId=95414) (Chinese Biomedical Language Understanding Evaluation), a benchmark of Nested Named Entity Recognition. We got the 2nd price of the benchmark by 2021/12/06.
 
 
 
 ## Approach
 
-TODO:
+**TODO:**
 
 picture or paper
 
