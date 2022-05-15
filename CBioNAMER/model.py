@@ -5,9 +5,6 @@ import math
 
 
 class SinusoidalPositionEmbedding(Module):
-    """定义Sin-Cos位置Embedding
-    """
-
     def __init__(
             self, output_dim, merge_mode='add', custom_position_ids=False):
         super(SinusoidalPositionEmbedding, self).__init__()
@@ -78,18 +75,12 @@ def add_mask_tril(logits, mask):
         mask = mask.type(logits.dtype)
     logits = sequence_masking(logits, mask, '-inf', logits.ndim - 2)
     logits = sequence_masking(logits, mask, '-inf', logits.ndim - 1)
-    # 排除下三角
     mask = torch.tril(torch.ones_like(logits), diagonal=-1)
     logits = logits - mask * 1e12
     return logits
 
 
 class GlobalPointer(Module):
-    """全局指针模块
-    将序列的每个(start, end)作为整体来进行判断
-    """
-    # last_hidden_state (torch.FloatTensor of shape (batch_size, sequence_length, hidden_size))
-    #(c_size, head_size, embedding_size) 9 64 1024
     def __init__(self, heads, head_size, hidden_size, RoPE=True):
         super(GlobalPointer, self).__init__()
         self.heads = heads
@@ -98,25 +89,14 @@ class GlobalPointer(Module):
         self.dense = nn.Linear(hidden_size, self.head_size * self.heads * 2)
 
     def forward(self, inputs, mask=None):
-        # last_hidden_state:(batch_size, seq_len, hidden_size)
-
-        # outputs:(batch_size, seq_len, ent_type_size*inner_dim*2)      ent_type=heads  inner_dim = head_size
         inputs = self.dense(inputs)
         inputs = torch.split(inputs, self.head_size * 2, dim=-1)
 
-        # 按照-1这个维度去分，每块包含x个小块
-        # outputs:(batch_size, seq_len, ent_type_size, inner_dim*2)
         inputs = torch.stack(inputs, dim=-2)
 
-        # 沿着一个新维度对输入张量序列进行连接。 序列中所有的张量都应该为相同形状
-        # qw,kw:(batch_size, seq_len, ent_type_size, inner_dim)
         qw, kw = inputs[..., :self.head_size], inputs[..., self.head_size:]
-        # 分出qw和kw
-        # RoPE编码
         if self.RoPE:
-            # pos_emb:(batch_size, seq_len, inner_dim)
             pos = SinusoidalPositionEmbedding(self.head_size, 'zero')(inputs)
-            # cos_pos,sin_pos: (batch_size, seq_len, 1, inner_dim)
             cos_pos = pos[..., None, 1::2].repeat(1, 1, 1, 2)
             sin_pos = pos[..., None, ::2].repeat(1, 1, 1, 2)
             qw2 = torch.stack([-qw[..., 1::2], qw[..., ::2]], 4)
@@ -125,10 +105,6 @@ class GlobalPointer(Module):
             kw2 = torch.stack([-kw[..., 1::2], kw[..., ::2]], 4)
             kw2 = torch.reshape(kw2, kw.shape)
             kw = kw * cos_pos + kw2 * sin_pos
-        # 计算内积
-        # logits:(batch_size, ent_type_size, seq_len, seq_len)
         logits = torch.einsum('bmhd , bnhd -> bhmn', qw, kw)
-        # 排除padding 排除下三角
         logits = add_mask_tril(logits, mask)
-        # scale返回
         return logits / self.head_size ** 0.5
