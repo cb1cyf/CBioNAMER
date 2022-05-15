@@ -2,8 +2,6 @@ import numpy as np
 import unicodedata
 
 def to_array(*args):
-    """批量转numpy的array
-    """
     results = [np.array(a) for a in args]
     if len(args) == 1:
         return results[0]
@@ -11,29 +9,19 @@ def to_array(*args):
         return results
 
 def is_control(ch):
-    """控制类字符判断
-    """
     return unicodedata.category(ch) in ('Cc', 'Cf')
 
 def is_special(ch):
-    """判断是不是有特殊含义的符号
-    """
     return bool(ch) and (ch[0] == '[') and (ch[-1] == ']') 
     #and(ch !='[UNK]')
 
 def stem(token):
-    """获取token的“词干”（如果是##开头，则自动去掉##）
-    """
     if token[:2] == '##':
         return token[2:]
     else:
         return token
 
 def rematch(tokenizer,text, tokens,):
-    """
-    给出原始的text和tokenize后的tokens的映射关系
-    """
-    
     text = text.lower()
     normalized_text, char_mapping = '', []
     for i, ch in enumerate(text):
@@ -53,9 +41,7 @@ def rematch(tokenizer,text, tokens,):
             i = i + 1
         else:
             token = stem(token)
-            #print(token)
             start = text[offset:].index(token) + offset
-            #print(start)
             end = start + len(token)
             token_mapping.append(char_mapping[start:end])
             offset = end
