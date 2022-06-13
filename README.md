@@ -1,7 +1,9 @@
 # CBio-NAMER
 
 **CBioNAMER** (**N**ested n**AM**ed **E**ntity **R**ecognition for **C**hinese **Bio**medical Text) is our method used in [CBLUE1.0](https://tianchi.aliyun.com/cblue) (Chinese Biomedical Language Understanding Evaluation), a benchmark of Nested Named Entity Recognition. 
+
 We got the 2nd price of the benchmark by 2022/06/13. 
+
 Single model CBioNAMER has surpassed human(67.0 in F1-score​).
 
 ## Result
