@@ -109,3 +109,5 @@ print(recognized_entity)
 # output:[{'start_idx': 9, 'end_idx': 11, 'type': 'dis', 'Chinese_type': '疾病', 'entity': '遗传病'}]
 ```
 
+
+
