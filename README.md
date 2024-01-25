@@ -20,7 +20,7 @@ Results of our single model CBioNAMER:
 
 ## Approach
 
-CBioNAMER is a sub-model in our result, which is based on [GlobalPointer](https://kexue.fm/archives/8373) (a powerful open-source model, thanks for author, we rewrite it with Pytorch) and [MacBert](https://github.com/ymcui/MacBERT). 
+CBioNAMER is a sub-model in our result, which is based on [GlobalPointer](https://kexue.fm/archives/8373) (a powerful open-source model, we rewrite it with Pytorch) and [MacBert](https://github.com/ymcui/MacBERT). 
 
 
 
